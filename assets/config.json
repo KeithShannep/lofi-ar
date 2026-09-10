@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-10T20:34:26.767Z",
+  "targets": [
+    {
+      "index": 0,
+      "name": "Shredder",
+      "video": "./assets/videos/0.mp4"
+    },
+    {
+      "index": 1,
+      "name": "Ghostface",
+      "video": "./assets/videos/1.mp4"
+    }
+  ]
+}
