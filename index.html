@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f0f12" />
+  <title>LoFi Layers AR</title>
+  <style>
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#0f0f12; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    #ar-container { position:fixed; inset:0; }
+    #ui { position:fixed; inset:0; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between; padding:env(safe-area-inset-top) 16px calc(18px + env(safe-area-inset-bottom)); box-sizing:border-box; z-index:10; }
+    .top { display:flex; justify-content:space-between; align-items:center; padding-top:12px; }
+    .brand { background:rgba(0,0,0,.58); color:#fff; padding:10px 14px; border-radius:16px; font-weight:800; letter-spacing:.4px; backdrop-filter:blur(10px); }
+    .status { align-self:center; margin-bottom:22px; background:rgba(0,0,0,.62); color:#fff; padding:12px 16px; border-radius:18px; font-size:14px; text-align:center; max-width:min(88vw,420px); backdrop-filter:blur(10px); }
+    .status.found { background:rgba(17,80,45,.78); }
+    .status.error { background:rgba(120,25,25,.82); }
+  </style>
+</head>
+<body>
+  <div id="ar-container"></div>
+  <div id="ui">
+    <div class="top"><div class="brand">LOFI LAYERS AR</div></div>
+    <div id="status" class="status">Allow camera access, then point at the target artwork.</div>
+  </div>
+
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { MindARThree } from 'https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js';
+
+    const statusEl = document.getElementById('status');
+    const container = document.getElementById('ar-container');
+
+    const mindarThree = new MindARThree({
+      container,
+      imageTargetSrc: './assets/targets.mind',
+      maxTrack: 1,
+      filterMinCF: 0.0001,
+      filterBeta: 0.001,
+      uiLoading: 'no',
+      uiScanning: 'no',
+      uiError: 'yes'
+    });
+
+    const { renderer, scene, camera } = mindarThree;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    // One target for the starter build. Target index 0 maps to the first image
+    // compiled into assets/targets.mind.
+    const anchor = mindarThree.addAnchor(0);
+
+    // Video texture laid directly over the recognized artwork.
+    const video = document.createElement('video');
+    video.src = './assets/animation.mp4';
+    video.loop = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'auto';
+    video.crossOrigin = 'anonymous';
+
+    const texture = new THREE.VideoTexture(video);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+
+    // Width is normalized to 1. Height is adjusted after video metadata loads.
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide,
+      toneMapped: false
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), material);
+    plane.position.z = 0.001;
+    anchor.group.add(plane);
+
+    video.addEventListener('loadstart', () => console.log('[LoFi AR] Video load started'));
+    video.addEventListener('canplay', () => console.log('[LoFi AR] Video can play'));
+    video.addEventListener('error', () => {
+      console.error('[LoFi AR] Video error:', video.error);
+      statusEl.textContent = 'VIDEO ERROR — target tracking can still be tested.';
+      statusEl.className = 'status error';
+    });
+
+    video.addEventListener('loadedmetadata', () => {
+      const aspect = video.videoHeight / video.videoWidth;
+      plane.geometry.dispose();
+      plane.geometry = new THREE.PlaneGeometry(1, aspect);
+    });
+
+    anchor.onTargetFound = async () => {
+      console.log('[LoFi AR] TARGET FOUND');
+      statusEl.textContent = 'TARGET FOUND — starting animation…';
+      statusEl.className = 'status found';
+      try {
+        await video.play();
+        statusEl.textContent = 'TARGET FOUND — VIDEO PLAYING';
+      } catch (e) {
+        console.warn('[LoFi AR] Video play blocked:', e);
+        statusEl.textContent = 'TARGET FOUND — VIDEO BLOCKED';
+        statusEl.className = 'status error';
+      }
+    };
+
+    anchor.onTargetLost = () => {
+      console.log('[LoFi AR] TARGET LOST');
+      statusEl.textContent = 'TARGET LOST — point back at the artwork.';
+      statusEl.className = 'status';
+      video.pause();
+    };
+
+    try {
+      statusEl.textContent = 'STARTING CAMERA…';
+      await mindarThree.start();
+      statusEl.textContent = 'SEARCHING FOR TARGET…';
+      statusEl.className = 'status';
+      console.log('[LoFi AR] Camera started. Searching for target 0.');
+      renderer.setAnimationLoop(() => renderer.render(scene, camera));
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'Could not start AR. Make sure this page is served over HTTPS and camera permission is allowed.';
+      statusEl.className = 'status error';
+    }
+  </script>
+</body>
+</html>
