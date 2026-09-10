@@ -1,0 +1,9 @@
+{
+  "targets": [
+    {
+      "index": 0,
+      "name": "Super Shredder",
+      "video": "./assets/videos/0.mp4"
+    }
+  ]
+}
