@@ -1,3 +1,0 @@
-Add:
-1. targets.mind
-2. animation.mp4
